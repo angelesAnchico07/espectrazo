@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+recordings/*.mp4
+videos/
+dataset/
+.ipynb_checkpoints/
