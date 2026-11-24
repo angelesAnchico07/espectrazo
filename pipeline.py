@@ -7,6 +7,8 @@ import torch.nn as nn
 
 # Mismos parámetros que el notebook de Colab (para que la CNN vea lo mismo que en el entrenamiento)
 FRAMES_FONDO = 30
+UMBRAL_DIF = 35   # diferencia mínima (0-255) respecto al fondo para contar como persona; ignora cambios leves de luz
+LR_CON_PERSONA, LR_SIN_PERSONA, LR_FANTASMA = 0.0, 0.005, 0.002   # con persona el fondo no se toca (no la "absorbe"); sin persona se actualiza
 AREA_MIN_FRAC, AREA_MAX_FRAC, ALTO_MIN_FRAC = 0.03, 0.45, 0.25
 
 
@@ -41,8 +43,41 @@ class Segmentador:
         self.reset()
 
     def reset(self):
-        self.mog = cv2.createBackgroundSubtractorMOG2(history=300, varThreshold=25, detectShadows=True)
+        self.mog = cv2.createBackgroundSubtractorMOG2(history=300, varThreshold=40, detectShadows=True)
         self.n = 0
+        self.hay_persona = False
+        self.hay_fantasma = False
+
+    @staticmethod
+    def _dif(a, b):
+        """Diferencia promedio (0-255) entre dos imágenes BGR, por píxel."""
+        return cv2.cvtColor(cv2.absdiff(a, b), cv2.COLOR_BGR2GRAY)
+
+    def _compensar_luz(self, blur, bg):
+        """La cámara cambia sola la exposición cuando entra la persona y eso aclara/oscurece toda la pared.
+        Se calcula la ganancia solo con los píxeles que se parecen al fondo (la persona se excluye porque
+        se diferencia mucho de él) y se corrige el cuadro."""
+        f, b = blur[::4, ::4], bg[::4, ::4]
+        libre = self._dif(f, b) < UMBRAL_DIF
+        if libre.mean() < 0.15:                        # cambio de luz muy brusco: usar todos los píxeles
+            libre = np.ones_like(libre)
+        r = (f[libre].astype(np.float32) + 1) / (b[libre].astype(np.float32) + 1)
+        g = np.clip(np.median(r, axis=0), 0.6, 1.6)
+        return np.clip(blur.astype(np.float32) / g, 0, 255).astype(np.uint8)
+
+    @staticmethod
+    def _bordes(img):
+        g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        return np.abs(cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=3)) + np.abs(cv2.Sobel(g, cv2.CV_32F, 0, 1, ksize=3))
+
+    def _es_fantasma(self, comp, e_act, e_bg):
+        """Un 'fantasma' es la zona donde estaba la persona cuando se aprendió el fondo: el fondo guardado
+        tiene bordes allí (la silueta de la persona) pero la imagen actual NO (es solo pared).
+        Un objeto real es al revés: bordes en la imagen actual, no en el fondo guardado."""
+        banda = cv2.morphologyEx(comp, cv2.MORPH_GRADIENT, self.kernel) > 0
+        if banda.sum() < 20:
+            return False
+        return e_bg[banda].mean() > 1.3 * e_act[banda].mean()
 
     @property
     def aprendiendo(self):
@@ -51,28 +86,50 @@ class Segmentador:
     def procesar(self, frame):
         """Devuelve (mascara_uint8 | None, (x, y, w, h, frac))."""
         aprendiendo = self.aprendiendo
-        mask = self.mog.apply(cv2.GaussianBlur(frame, (5, 5), 0), learningRate=-1 if aprendiendo else 0)
-        self.n += 1
+        self.stats = None
+        blur = cv2.GaussianBlur(frame, (5, 5), 0)
         if aprendiendo:
+            mask = self.mog.apply(blur, learningRate=-1)
+            self.n += 1
             return None, None
+        bg = self.mog.getBackgroundImage()
+        blur = self._compensar_luz(blur, bg)
+        lr = LR_FANTASMA if self.hay_fantasma else (LR_CON_PERSONA if self.hay_persona else LR_SIN_PERSONA)
+        mask = self.mog.apply(blur, learningRate=lr)
+        self.n += 1
+        mask[self._dif(blur, bg) < UMBRAL_DIF] = 0     # solo lo que se diferencia MUCHO del fondo es persona
         _, mask = cv2.threshold(mask, 200, 255, cv2.THRESH_BINARY)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, self.kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self.kernel_cierre, iterations=2)  # tapa huecos
         n, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+        self.hay_persona = self.hay_fantasma = False
         if n <= 1:
             return None, None
-        i = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
         H, W = mask.shape
-        frac = stats[i, cv2.CC_STAT_AREA] / (H * W)
-        if frac < AREA_MIN_FRAC:
+        e_act, e_bg = self._bordes(blur), self._bordes(bg)
+        i = None
+        for c in 1 + np.argsort(-stats[1:, cv2.CC_STAT_AREA])[:3]:      # los 3 más grandes
+            if stats[c, cv2.CC_STAT_AREA] / (H * W) < AREA_MIN_FRAC:
+                break
+            if self._es_fantasma((labels == c).astype(np.uint8), e_act, e_bg):
+                self.hay_fantasma = True          # se va "olvidando" poco a poco (ver LR_FANTASMA)
+            else:
+                i = int(c)
+                break
+        if i is None:
             return None, None
+        frac = stats[i, cv2.CC_STAT_AREA] / (H * W)
+        self.hay_persona = True
         x, y, w, h = (int(stats[i, k]) for k in (cv2.CC_STAT_LEFT, cv2.CC_STAT_TOP,
                                                   cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT))
         comp = (labels == i).astype(np.uint8)
+        area_antes = int(comp.sum())
         # Rellenar todos los huecos internos: la silueta queda sólida, sin manchas negras
         contornos, _ = cv2.findContours(comp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         comp = np.zeros_like(comp)
         cv2.drawContours(comp, contornos, -1, 1, thickness=cv2.FILLED)
+        # Datos para evaluar.py: componentes espurios (todos menos la silueta) y huecos rellenados
+        self.stats = dict(espurios=n - 2, area_antes=area_antes, area_final=int(comp.sum()))
         return comp, (x, y, w, h, frac)
 
 
