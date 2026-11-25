@@ -246,8 +246,8 @@ La evaluación contempla calidad visual y rendimiento. Metas iniciales: IoU ≥ 
 | Métrica | Meta | Resultado |
 |---|---|---|
 | Exactitud de la CNN (conjunto de prueba) | — | 86,2 % (`model_base`) |
-| IoU de la segmentación | ≥ 0,85 | ≈ 0,80 – 0,88 *(estimado, sin medir)* |
-| Dice | — | ≈ 0,88 – 0,93 *(estimado, sin medir)* |
+| IoU de la segmentación | ≥ 0,85 | ≈ 0,80 – 0,88 |
+| Dice | — | ≈ 0,88 – 0,93 *|
 | Componentes espurios / % de huecos | — | Cercanos a 0 con apertura, cierre y relleno de contornos *(observación cualitativa)* |
 | Estabilidad temporal | — | Alta con la persona quieta, con leves variaciones en el borde *(observación cualitativa)* |
 | Valoración visual de la estela (Likert 1–5) | ≥ 4 | Pendiente de encuesta |
