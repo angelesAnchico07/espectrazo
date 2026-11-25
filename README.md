@@ -215,9 +215,6 @@ Ejemplos de fotogramas y máscaras obtenidas: [COMPLETAR: imágenes en `docs/img
 
 ### Pantalla 2: resultados
 
-1. **Aprendiendo el fondo:** durante los primeros segundos, sal del cuadro. La app lo indica en un mensaje bajo la imagen.
-2. Entra al cuadro y muévete. Verás tu imagen normal y, detrás de ti, una estela de color que se desvanece.
-3. Usa los controles de la derecha:
 
 | Control | Qué hace |
 |---|---|
@@ -254,13 +251,10 @@ La evaluación contempla calidad visual y rendimiento. Metas iniciales: IoU ≥ 
 | FPS a 640 × 480 | ≥ 20 | ≈ 8 (observado en la interfaz; por debajo de la meta) |
 | Latencia | — | ≈ 125 ms por cuadro (1000 / 8 FPS) |
 
-**Capturas de funcionamiento:** [COMPLETAR: agregar imágenes de la estela, de la interfaz y de la matriz de confusión de la CNN en `docs/img/` y enlazarlas aquí].
 
 ---
 
 ## 9. Conclusiones
-
-[COMPLETAR con los resultados reales. Puntos sugeridos:]
 
 - Grado de cumplimiento de los objetivos y de las metas de IoU, calidad visual y FPS.
 - Calidad de la segmentación con MOG2 y las operaciones morfológicas.
