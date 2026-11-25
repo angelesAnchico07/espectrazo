@@ -246,13 +246,13 @@ La evaluación contempla calidad visual y rendimiento. Metas iniciales: IoU ≥ 
 | Métrica | Meta | Resultado |
 |---|---|---|
 | Exactitud de la CNN (conjunto de prueba) | — | 86,2 % (`model_base`) |
-| IoU de la segmentación | ≥ 0,85 | [COMPLETAR] |
-| Dice | — | [COMPLETAR] |
-| Componentes espurios / % de huecos | — | [COMPLETAR] |
-| Estabilidad temporal | — | [COMPLETAR] |
-| Valoración visual de la estela (Likert 1–5) | ≥ 4 | [COMPLETAR] |
-| FPS a 640 × 480 | ≥ 20 | [COMPLETAR] |
-| Latencia | — | [COMPLETAR] |
+| IoU de la segmentación | ≥ 0,85 | ≈ 0,80 – 0,88 *(estimado, sin medir)* |
+| Dice | — | ≈ 0,88 – 0,93 *(estimado, sin medir)* |
+| Componentes espurios / % de huecos | — | Cercanos a 0 con apertura, cierre y relleno de contornos *(observación cualitativa)* |
+| Estabilidad temporal | — | Alta con la persona quieta, con leves variaciones en el borde *(observación cualitativa)* |
+| Valoración visual de la estela (Likert 1–5) | ≥ 4 | Pendiente de encuesta |
+| FPS a 640 × 480 | ≥ 20 | ≈ 8 (observado en la interfaz; por debajo de la meta) |
+| Latencia | — | ≈ 125 ms por cuadro (1000 / 8 FPS) |
 
 **Capturas de funcionamiento:** [COMPLETAR: agregar imágenes de la estela, de la interfaz y de la matriz de confusión de la CNN en `docs/img/` y enlazarlas aquí].
 
